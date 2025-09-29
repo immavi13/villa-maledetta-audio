@@ -1,29 +1,35 @@
 #!/usr/bin/env bash
-# Converte tutti i file sorgente in MP3 compatibili Alexa con i nomi richiesti.
-# Uso: ./convert_all.sh /path/ai/tuoi/suoni
-# Richiede: ffmpeg
-
 set -euo pipefail
 
-SRC="${1:-}"
-if [ -z "$SRC" ]; then
-  echo "Uso: $0 /percorso/ai/suoni_originali"
+INPUT_DIR="${1:-audio}"
+OUT_DIR="$INPUT_DIR"
+
+need=(porta vento sting book paper clock)
+
+# Verifica ffmpeg
+if ! command -v ffmpeg >/dev/null 2>&1; then
+  echo "Errore: ffmpeg non trovato. Installa con: brew install ffmpeg"
   exit 1
 fi
 
-mkdir -p audio
+for name in "${need[@]}"; do
+  # trova il primo file esistente fra mp3/wav/m4a/ogg
+  src=""
+  for ext in mp3 wav m4a ogg; do
+    f="$INPUT_DIR/$name.$ext"
+    if [ -f "$f" ]; then src="$f"; break; fi
+  done
 
-convert() {
-  in="$1"; out="$2"
-  echo "-> Converto '$in' -> 'audio/$out'"
-  ffmpeg -y -i "$in" -ar 24000 -ac 1 -b:a 128k -codec:a libmp3lame "audio/$out"
-}
+  if [ -z "$src" ]; then
+    echo "Manca $name.{mp3|wav|m4a|ogg} in $INPUT_DIR — salto."
+    continue
+  fi
 
-convert "$SRC/porta.*" porta.mp3 || true
-convert "$SRC/vento.*" vento.mp3 || true
-convert "$SRC/sting.*" sting.mp3 || true
-convert "$SRC/book.*"  book.mp3  || true
-convert "$SRC/paper.*" paper.mp3 || true
-convert "$SRC/clock.*" clock.mp3 || true
+  out="$OUT_DIR/$name.mp3"
+  tmp="$OUT_DIR/$name.tmp.mp3"     # <<— estensione mp3 PRIMA di .tmp
 
-echo "Fatto. Carica i file nella repo e abilita GitHub Pages."
+  echo "Converto $src -> $out"
+  ffmpeg -y -i "$src" -ar 22050 -ac 1 -b:a 48k -codec:a libmp3lame -f mp3 "$tmp"
+done
+
+echo "Fatto. Ricordati di fare commit & push."
